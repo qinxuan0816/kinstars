@@ -17,11 +17,14 @@ function App() {
   const [error, setError] = useState("");
   const [report, setReport] = useState("");
   const [reportLoading, setReportLoading] = useState(false);
+  const [macro, setMacro] = useState([]);
+  const [macroLoading, setMacroLoading] = useState(false);
 
   const fetchAll = async (tk, per) => {
     setLoading(true);
     setError("");
     setReport("");
+    setMacro([]);
     try {
       const [cRes, pRes, fRes, sRes] = await Promise.all([
         fetch(`${API_BASE}/company/${tk}`),
@@ -76,6 +79,22 @@ function App() {
     }
   };
 
+  const handleMacro = async () => {
+    if (!company) return;
+    setMacroLoading(true);
+    setMacro([]);
+    try {
+      const res = await fetch(`${API_BASE}/macro/${company.ticker}`);
+      if (!res.ok) throw new Error("Macro failed");
+      const data = await res.json();
+      setMacro(data.macro_factors || []);
+    } catch (err) {
+      setMacro([]);
+    } finally {
+      setMacroLoading(false);
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter") handleSearch();
   };
@@ -88,6 +107,12 @@ function App() {
   };
 
   const periods = ["1mo", "6mo", "1y", "5y"];
+
+  const impactColor = (impact) => {
+    if (impact === "Positive") return "#34d399";
+    if (impact === "Negative") return "#f87171";
+    return "#fbbf24"; // Mixed
+  };
 
   return (
     <div style={styles.page}>
@@ -175,31 +200,43 @@ function App() {
           <div style={styles.card}>
             <h3 style={styles.chartTitle}>Risk & Quality Scores</h3>
             <div style={styles.scoreGrid}>
-              <ScoreCard
-                label="Growth"
-                value={scores.growth_score}
-                detail={scores.revenue_growth_pct != null ? `Rev +${scores.revenue_growth_pct}%` : ""}
-                good="High"
-              />
-              <ScoreCard
-                label="Profitability"
-                value={scores.profitability_score}
-                detail={scores.net_margin_pct != null ? `Margin ${scores.net_margin_pct}%` : ""}
-                good="High"
-              />
-              <ScoreCard
-                label="Valuation Risk"
-                value={scores.valuation_risk}
-                detail={scores.pe != null ? `P/E ${scores.pe}` : ""}
-                good="Low"
-              />
-              <ScoreCard
-                label="Overall Risk"
-                value={scores.overall_risk}
-                detail=""
-                good="Low"
-              />
+              <ScoreCard label="Growth" value={scores.growth_score}
+                detail={scores.revenue_growth_pct != null ? `Rev +${scores.revenue_growth_pct}%` : ""} good="High" />
+              <ScoreCard label="Profitability" value={scores.profitability_score}
+                detail={scores.net_margin_pct != null ? `Margin ${scores.net_margin_pct}%` : ""} good="High" />
+              <ScoreCard label="Valuation Risk" value={scores.valuation_risk}
+                detail={scores.pe != null ? `P/E ${scores.pe}` : ""} good="Low" />
+              <ScoreCard label="Overall Risk" value={scores.overall_risk} detail="" good="Low" />
             </div>
+          </div>
+        )}
+
+        {company && (
+          <div style={styles.card}>
+            <div style={styles.chartHeader}>
+              <h3 style={styles.chartTitle}>Macroeconomic Impact</h3>
+              <button style={styles.reportBtn} onClick={handleMacro} disabled={macroLoading}>
+                {macroLoading ? "Analyzing..." : "Analyze Macro"}
+              </button>
+            </div>
+            {macroLoading && (
+              <p style={styles.info}>AI is analyzing macro factors for {company.ticker}...</p>
+            )}
+            {macro.length > 0 && !macroLoading && (
+              <div>
+                {macro.map((f, i) => (
+                  <div key={i} style={styles.macroItem}>
+                    <div style={styles.macroHeader}>
+                      <span style={styles.macroFactor}>{f.factor}</span>
+                      <span style={{ ...styles.macroBadge, background: impactColor(f.impact) }}>
+                        {f.impact}
+                      </span>
+                    </div>
+                    <p style={styles.macroExp}>{f.explanation}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -244,7 +281,6 @@ function ScoreCard({ label, value, detail, good }) {
   if (value === good) color = "#34d399";
   else if (value === "Medium") color = "#fbbf24";
   else if (value !== "N/A") color = "#f87171";
-
   return (
     <div style={{ ...styles.scoreCard, borderColor: color }}>
       <div style={styles.scoreLabel}>{label}</div>
@@ -285,6 +321,11 @@ const styles = {
   scoreLabel: { fontSize: "12px", color: "#94a3b8" },
   scoreValue: { fontSize: "20px", fontWeight: "700", marginTop: "6px" },
   scoreDetail: { fontSize: "11px", color: "#64748b", marginTop: "4px" },
+  macroItem: { background: "#0f172a", padding: "14px", borderRadius: "8px", marginBottom: "10px" },
+  macroHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  macroFactor: { fontSize: "15px", fontWeight: "600" },
+  macroBadge: { fontSize: "11px", fontWeight: "700", color: "#0f172a", padding: "2px 10px", borderRadius: "12px" },
+  macroExp: { fontSize: "13px", lineHeight: "1.5", color: "#cbd5e1", marginTop: "8px", marginBottom: 0 },
 };
 
 export default App;

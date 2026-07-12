@@ -81,3 +81,9 @@ def scores(ticker: str):
     """Return rule-based risk/quality scores for a ticker."""
     from src.scoring import compute_scores
     return compute_scores(ticker)
+
+@app.get("/macro/{ticker}")
+def macro(ticker: str):
+    """Return AI macroeconomic factor analysis for a ticker."""
+    from src.macro import analyze_macro
+    return analyze_macro(ticker)
