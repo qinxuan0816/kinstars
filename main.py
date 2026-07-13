@@ -87,3 +87,9 @@ def macro(ticker: str):
     """Return AI macroeconomic factor analysis for a ticker."""
     from src.macro import analyze_macro
     return analyze_macro(ticker)
+
+@app.get("/compare/{ticker_a}/{ticker_b}")
+def compare(ticker_a: str, ticker_b: str):
+    """AI comparison summary between two companies."""
+    from src.compare import compare_companies
+    return compare_companies(ticker_a, ticker_b)
