@@ -45,3 +45,15 @@ Kinstars uses a **decoupled frontend/backend architecture**:
 - The **FastAPI backend** exposes REST endpoints (`/company`, `/prices`, `/financials`, `/scores`, `/macro`, `/report`) and handles all data fetching, scoring logic, and LLM calls.
 - The **React frontend** consumes these endpoints and renders an interactive dashboard.
 - Data-fetching logic is isolated in a dedicated module, so the data source can be swapped without touching the API or UI layers.
+
+## Evaluation
+
+Because errors in a financial context are costly, Kinstars includes an evaluation harness (`/eval`) that tests the reliability of its AI-generated outputs:
+
+**1. Numeric accuracy regression test** (`eval/eval_numeric.py`)
+Checks that key financial figures (revenue, net income, P/E) in the generated report match the ground-truth data from yfinance, within a 2% tolerance. Current result: **9/9 metrics correct (100%)** across AAPL, MSFT, and NVDA.
+
+**2. LLM-as-judge hallucination detection** (`eval/eval_hallucination.py`)
+A separate LLM acts as a fact-checking judge, verifying that every claim in the report is grounded in the source data and flagging any unsupported statements.
+
+A notable finding: the first version of the judge returned 0/3 grounded — but on inspection, the failures were **false positives from the evaluation itself**: the source data wasn't labeled by year (so the judge couldn't verify figures), and the judging criteria were too strict (flagging reasonable industry commentary). After improving the evaluation context and criteria, the result became **3/3 fully grounded** (~25 claims verified per report). This reinforced a key lesson: the reliability of the evaluation is as important as the system being evaluated — a false-positive-prone eval can be worse than none.
