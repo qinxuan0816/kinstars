@@ -9,28 +9,42 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 GEN_MODEL = "models/gemini-2.5-flash"
 
 
-def _summarize_financials(fin):
-    """Pull a few key rows from the income statement into readable text."""
-    income = fin["income_statement"]
+def _summarize_financials_from_list(financials):
+    """Build readable text from a list of {year, revenue, ...} dicts."""
+    if not financials:
+        return "Financial detail not available."
     lines = []
-    wanted = ["Total Revenue", "Gross Profit", "Operating Income", "Net Income"]
-    for row in wanted:
-        if row in income.index:
-            vals = income.loc[row].dropna()
-            # take up to 4 most recent periods
-            recent = vals.head(4)
-            formatted = ", ".join(
-                f"{col.year if hasattr(col, 'year') else col}: {v/1e9:.1f}B"
-                for col, v in recent.items()
-            )
-            lines.append(f"{row}: {formatted}")
+    keys = {"revenue": "Total Revenue", "gross_profit": "Gross Profit",
+            "operating_income": "Operating Income", "net_income": "Net Income"}
+    for key, label in keys.items():
+        vals = [(f["year"], f[key]) for f in financials if key in f]
+        if vals:
+            s = ", ".join(f"{y}: {v:.1f}B" for y, v in vals)
+            lines.append(f"{label}: {s}")
     return "\n".join(lines) if lines else "Financial detail not available."
 
 
-def generate_report(ticker):
-    info = get_company_info(ticker)
-    fin = get_financials(ticker)
-    fin_summary = _summarize_financials(fin)
+def generate_report(ticker, info=None, financials=None):
+    """Generate a report. If info/financials are provided (from cache),
+    use them; otherwise fetch live from yfinance."""
+    if info is None:
+        info = get_company_info(ticker)
+
+    if financials is not None:
+        fin_summary = _summarize_financials_from_list(financials)
+    else:
+        fin = get_financials(ticker)
+        income = fin["income_statement"]
+        lines = []
+        for row in ["Total Revenue", "Gross Profit", "Operating Income", "Net Income"]:
+            if row in income.index:
+                vals = income.loc[row].dropna().head(4)
+                formatted = ", ".join(
+                    f"{col.year if hasattr(col, 'year') else col}: {v/1e9:.1f}B"
+                    for col, v in vals.items()
+                )
+                lines.append(f"{row}: {formatted}")
+        fin_summary = "\n".join(lines) if lines else "Financial detail not available."
 
     mc = info.get("market_cap")
     mc_str = f"{mc/1e9:.1f}B" if mc else "N/A"
@@ -68,10 +82,3 @@ Keep each section concise (2-4 sentences). Write in English."""
     model = genai.GenerativeModel(GEN_MODEL)
     response = model.generate_content(prompt)
     return response.text
-
-
-if __name__ == "__main__":
-    ticker = "AAPL"
-    print(f"Generating report for {ticker}...\n")
-    report = generate_report(ticker)
-    print(report)

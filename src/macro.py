@@ -10,8 +10,9 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 GEN_MODEL = "models/gemini-2.5-flash"
 
 
-def analyze_macro(ticker):
-    info = get_company_info(ticker)
+def analyze_macro(ticker, info=None):
+    if info is None:
+        info = get_company_info(ticker)
 
     prompt = f"""You are a macroeconomic analyst. Analyze how key macroeconomic
 factors affect the company below. Connect each factor to the company's specific
@@ -35,14 +36,9 @@ Do not include any text outside the JSON array."""
 
     model = genai.GenerativeModel(GEN_MODEL)
     response = model.generate_content(prompt)
-
     text = response.text.strip().replace("```json", "").replace("```", "").strip()
     try:
         factors = json.loads(text)
     except Exception:
         factors = []
     return {"ticker": ticker.upper(), "macro_factors": factors}
-
-
-if __name__ == "__main__":
-    print(json.dumps(analyze_macro("TSLA"), indent=2))

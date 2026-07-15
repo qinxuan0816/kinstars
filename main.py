@@ -84,17 +84,32 @@ def scores(ticker: str):
 @app.get("/report/{ticker}")
 def report(ticker: str):
     from src.report import generate_report
-    text = generate_report(ticker)
+    cached = load_cache(ticker)
+    if cached:
+        text = generate_report(ticker, info=cached["info"], financials=cached["financials"])
+    else:
+        text = generate_report(ticker)
     return {"ticker": ticker.upper(), "report": text}
 
 
 @app.get("/macro/{ticker}")
 def macro(ticker: str):
     from src.macro import analyze_macro
+    cached = load_cache(ticker)
+    if cached:
+        return analyze_macro(ticker, info=cached["info"])
     return analyze_macro(ticker)
 
 
 @app.get("/compare/{ticker_a}/{ticker_b}")
 def compare(ticker_a: str, ticker_b: str):
     from src.compare import compare_companies
-    return compare_companies(ticker_a, ticker_b)
+    cache_a = load_cache(ticker_a)
+    cache_b = load_cache(ticker_b)
+    return compare_companies(
+        ticker_a, ticker_b,
+        info_a=cache_a["info"] if cache_a else None,
+        scores_a=cache_a["scores"] if cache_a else None,
+        info_b=cache_b["info"] if cache_b else None,
+        scores_b=cache_b["scores"] if cache_b else None,
+    )
