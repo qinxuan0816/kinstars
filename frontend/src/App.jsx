@@ -86,13 +86,28 @@ function App() {
     setReportLoading(true);
     setReport("");
     try {
-      const res = await fetch(`${API_BASE}/report/${company.ticker}`);
-      if (!res.ok) throw new Error("Report failed");
-      const data = await res.json();
-      setReport(data.report || "");
+      const res = await fetch(`${API_BASE}/report_stream/${company.ticker}`);
+      if (!res.ok || !res.body) throw new Error("Report failed");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      // hide the loading spinner as soon as first text arrives
+      let firstChunk = true;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        accumulated += text;
+        if (firstChunk) {
+          setReportLoading(false);
+          firstChunk = false;
+        }
+        setReport(accumulated);
+      }
     } catch (err) {
       setReport("Failed to generate report. Please try again.");
-    } finally {
       setReportLoading(false);
     }
   };

@@ -1,6 +1,7 @@
 import os
 import json
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.data_fetch import get_company_info, get_price_history
 
@@ -113,3 +114,16 @@ def compare(ticker_a: str, ticker_b: str):
         info_b=cache_b["info"] if cache_b else None,
         scores_b=cache_b["scores"] if cache_b else None,
     )
+
+@app.get("/report_stream/{ticker}")
+def report_stream(ticker: str):
+    from src.report import generate_report_stream
+    cached = load_cache(ticker)
+    info = cached["info"] if cached else None
+    financials = cached["financials"] if cached else None
+
+    def event_generator():
+        for chunk in generate_report_stream(ticker, info=info, financials=financials):
+            yield chunk
+
+    return StreamingResponse(event_generator(), media_type="text/plain")
